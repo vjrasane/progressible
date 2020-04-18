@@ -1,4 +1,4 @@
-import create, { ProgressPromise } from "../src";
+import ProgressPromise from "../src/index";
 import { toUpper, capitalize } from "lodash";
 
 jest.useFakeTimers();
@@ -7,10 +7,16 @@ const delay = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-describe("create", () => {
+describe("ProgressPromise", () => {
+  it("resolves immediately without any arguments", async () => {
+    const wrapped = new ProgressPromise();
+
+    expect(await wrapped).toEqual(undefined);
+  });
+
   it("creates regular promise", async () => {
     const promise = delay(3000).then(() => "result");
-    const wrapped = create((resolve) => resolve(promise));
+    const wrapped = new ProgressPromise(promise);
 
     jest.advanceTimersByTime(3000);
 
@@ -24,7 +30,7 @@ describe("create", () => {
 
     const progress = jest.fn();
 
-    const wrapped = create(async (resolve, reject, onProgress) => {
+    const wrapped = new ProgressPromise(async (resolve, reject, onProgress) => {
       await delay1000;
       onProgress(1000);
       await delay2000;
@@ -49,7 +55,7 @@ describe("create", () => {
 
   it("can call then on created promise", async () => {
     const promise = delay(3000).then(() => "result");
-    const wrapped = create((resolve) => resolve(promise));
+    const wrapped = new ProgressPromise(promise);
     const chained = wrapped.then(toUpper);
 
     jest.advanceTimersByTime(3000);
@@ -64,7 +70,7 @@ describe("create", () => {
 
     const progress = jest.fn();
 
-    const wrapped = create(async (resolve, reject, onProgress) => {
+    const wrapped = new ProgressPromise(async (resolve, reject, onProgress) => {
       await delay1000;
       onProgress(1000);
       await delay2000;
@@ -97,7 +103,7 @@ describe("create", () => {
 
     const progress = jest.fn();
 
-    const wrapped = create(async (resolve, reject, onProgress) => {
+    const wrapped = new ProgressPromise(async (resolve, reject, onProgress) => {
       await delay1000;
       onProgress(1000);
       await delay2000;
@@ -143,7 +149,7 @@ describe("create", () => {
     const progress2 = jest.fn();
     const progress3 = jest.fn();
 
-    const wrapped = create(async (resolve, reject, onProgress) => {
+    const wrapped = new ProgressPromise(async (resolve, reject, onProgress) => {
       await delay1000;
       onProgress(1000);
       await delay2000;

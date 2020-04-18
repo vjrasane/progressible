@@ -1,91 +1,99 @@
-import { isFunction } from "lodash";
+import { noop, isFunction } from "lodash";
 
-type Listener<T> = (value: T) => void;
+type Listener<B> = (value: B) => void;
 
-type Broadcast<T> = (value: T) => void;
+type Broadcast<B> = (value: B) => void;
 
-type Subscribe<T, R> = (listener: Listener<T>) => ProgressPromise<T, R>;
+type Resolve<R> = (value?: R | PromiseLike<R>) => void;
 
-type Init<T> = (resolve, reject, onProgress: Broadcast<T>) => any;
+type OnFulfilled<R, T, B> = (
+  value: R,
+  progress: Broadcast<B>
+) => T | PromiseLike<T>;
 
-type ProgressResolve<T, R, N> = (result: R, onProgress: Broadcast<T>) => N;
+type Reject = (reason?: any) => void;
 
-type ProgressReject<T, E, N> = (error: E, onProgress: Broadcast<T>) => N;
+type Subscribe<B> = (listener: Listener<B>) => ProgressPromise<any, B>;
 
-export interface ProgressPromise<T, R> {
-  progress: Subscribe<T, R>;
-  then: <N>(
-    onResolved: ProgressResolve<T, R, N>,
-    onRejected?: ProgressReject<T, Error, N>
-  ) => ProgressPromise<T, R>;
-  catch: <N>(onRejected: ProgressReject<T, Error, N>) => ProgressPromise<T, R>;
-}
+type Executor<R, T> = (
+  resolve: Resolve<R>,
+  reject: Reject,
+  broadcast: Broadcast<T>
+) => void;
 
-const cast = <T, R>(promise: Promise<R>): ProgressPromise<T, R> => {
-  const _cast = <any>promise;
-  return <ProgressPromise<T, R>>_cast;
+const broadcast = <B>(
+  listeners: Listener<B>[],
+  reject: Reject
+): Broadcast<B> => (value: B) => {
+  try {
+    listeners.forEach((listen) => listen(value));
+  } catch (error) {
+    reject(error);
+  }
 };
 
-const create = <T, R>(init: Init<T>): ProgressPromise<T, R> => {
-  const initialListeners: Listener<T>[] = [];
-  const broadcast = (listeners: Listener<T>[]): Broadcast<T> => (value: T) =>
-    listeners.forEach((listen) => listen(value));
+const cast = <A, B>(value: A) => {
+  const tmp: any = <any>value;
+  return <B>tmp;
+};
 
-  const subscribe = (listener: Listener<T>) => initialListeners.push(listener);
+class ProgressPromise<R, B> {
+  readonly listeners: Listener<B>[];
+  private readonly subscribe: Subscribe<B>;
+  private readonly promise: Promise<R>;
+  private __resolve: Resolve<R>;
+  private __reject: (reason?: any) => void;
 
-  const initialPromise: ProgressPromise<T, R> = cast(
-    new Promise((resolve, reject) =>
-      init(resolve, reject, broadcast(initialListeners))
-    )
-  );
+  get [Symbol.toStringTag]() {
+    return "ProgressPromise";
+  }
 
-  const wrap = <R>(
-    promise: ProgressPromise<T, R>,
-    ownSubscribe: (l: Listener<T>) => void,
-    _then: Function,
-    _catch: Function
-  ): ProgressPromise<T, R> => {
-    const progress: Subscribe<T, R> = (listener: Listener<T>) => {
-      ownSubscribe(listener);
-      return promise;
-    };
+  constructor(
+    promiser?: Executor<R, B> | Promise<R>,
+    subscribe: Subscribe<B> = noop,
+    listeners: Listener<B>[] = []
+  ) {
+    this.listeners = listeners;
+    this.promise = new Promise((resolve: Resolve<R>, reject) => {
+      this.__resolve = resolve;
+      this.__reject = reject;
+      if (isFunction(promiser))
+        (<Executor<R, B>>promiser)(
+          resolve,
+          reject,
+          broadcast(this.listeners, reject)
+        );
+      else resolve(<Promise<R>>promiser);
+    });
+    this.subscribe = subscribe;
+  }
 
-    const createClosure = () => {
-      const childListeners: Listener<T>[] = [];
-      const childBroadcast: Broadcast<T> = broadcast(childListeners);
-      const childSubscribe = (listener: Listener<T>) => {
-        childListeners.push(listener);
-        ownSubscribe(listener);
-      };
-      return { childBroadcast, childSubscribe };
-    };
-
-    promise.progress = progress;
-    promise.then = (onResolved, onRejected) => {
-      const { childBroadcast, childSubscribe } = createClosure();
-      const wrappedResolver = (res: R) => onResolved(res, childBroadcast);
-      const wrappedReject = isFunction(onRejected)
-        ? (error: Error) => onRejected(error, childBroadcast)
-        : undefined;
-      const chained = _then.call(promise, wrappedResolver, wrappedReject);
-      return wrap(chained, childSubscribe, chained.then, chained.catch);
-    };
-
-    promise.catch = (onRejected) => {
-      const { childBroadcast, childSubscribe } = createClosure();
-      const wrappedReject = (error: Error) => onRejected(error, childBroadcast);
-      const chained = _catch.call(promise, wrappedReject);
-      return wrap(chained, childSubscribe, chained.then, chained.catch);
-    };
-    return promise;
+  progress: Subscribe<B> = (listener: Listener<B>) => {
+    this.listeners.push(listener);
+    this.subscribe(listener);
+    return this;
   };
 
-  return wrap(
-    initialPromise,
-    subscribe,
-    initialPromise.then,
-    initialPromise.catch
-  );
-};
+  then = <T>(
+    onFulfilled?: OnFulfilled<R, T, B>,
+    onRejected?: (reason: any) => PromiseLike<never>
+  ): ProgressPromise<R, T> => {
+    const listeners = [];
+    const __onFulfilled = (value: R) =>
+      onFulfilled(value, broadcast(listeners, this.__reject));
+    const then = this.promise.then(
+      isFunction(onFulfilled) && __onFulfilled,
+      onRejected
+    );
+    return cast(new ProgressPromise(then, this.progress, listeners));
+  };
 
-export default create;
+  catch = (onRejected?: Reject) => this.promise.catch(onRejected);
+
+  resolve: Resolve<R> = (value?: R | PromiseLike<R>): void =>
+    this.__resolve(value);
+
+  reject: Reject = (reason?: any): void => this.__reject(reason);
+}
+
+export default ProgressPromise;
