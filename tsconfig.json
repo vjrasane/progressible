@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "declarationDir": "./types",
+    "outDir": "./build",
+    "module": "commonjs",
+    "target": "es5",
+    "lib": ["ES6", "DOM"]
+  },
+  "files": [
+    "src/index.ts"
+  ]
+}
