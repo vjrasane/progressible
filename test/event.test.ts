@@ -1,5 +1,5 @@
 import BroadcastPromise from "../src";
-import { toUpper, capitalize } from "lodash";
+import { toUpper } from "lodash";
 
 jest.useFakeTimers();
 

@@ -84,7 +84,7 @@ describe("broadcast", () => {
     const broadcast1 = jest.fn();
     const broadcast2 = jest.fn();
 
-    const wrapped = new BroadcastPromise(
+    const wrapped = new BroadcastPromise<string, number>(
       async (resolve, reject, { broadcast }) => {
         await delay1000;
         broadcast("broadcast", 1000);
@@ -97,7 +97,7 @@ describe("broadcast", () => {
     ).on("broadcast", broadcast1);
 
     const delay4000 = delay(4000);
-    const chained = wrapped
+    const chained: BroadcastPromise<string, number> = wrapped
       .then(async (res, { broadcast }) => {
         await delay4000;
         broadcast("broadcast", 4000);
@@ -137,7 +137,7 @@ describe("broadcast", () => {
     const broadcast2 = jest.fn();
     const broadcast3 = jest.fn();
 
-    const wrapped = new BroadcastPromise(
+    const wrapped = new BroadcastPromise<string, number | string>(
       async (resolve, reject, { broadcast }) => {
         await delay1000;
         broadcast("broadcast", 1000);
@@ -150,7 +150,7 @@ describe("broadcast", () => {
     ).on("broadcast", broadcast1);
 
     const delay4000 = delay(4000);
-    const chained1 = wrapped
+    const chained1: BroadcastPromise<string, number | string> = wrapped
       .then(async (res, { broadcast }) => {
         await delay4000;
         broadcast("broadcast", "chained1");
@@ -158,7 +158,7 @@ describe("broadcast", () => {
       })
       .on("broadcast", broadcast2);
 
-    const chained2 = wrapped
+    const chained2: BroadcastPromise<string, number | string> = wrapped
       .then(async (res, { broadcast }) => {
         await delay4000;
         broadcast("broadcast", "chained2");

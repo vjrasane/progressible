@@ -15,15 +15,17 @@ describe("emit", () => {
 
     const emit = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { emit }) => {
-      await delay1000;
-      emit("emit", 1000);
-      await delay2000;
-      emit("emit", 2000);
-      await delay3000;
-      emit("emit", 3000);
-      resolve("result");
-    }).on("emit", emit);
+    const wrapped = new BroadcastPromise<string, number>(
+      async (resolve, reject, { emit }) => {
+        await delay1000;
+        emit("emit", 1000);
+        await delay2000;
+        emit("emit", 2000);
+        await delay3000;
+        emit("emit", 3000);
+        resolve("result");
+      }
+    ).on("emit", emit);
 
     jest.advanceTimersByTime(1000);
     await delay1000;
@@ -45,17 +47,19 @@ describe("emit", () => {
 
     const emit = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { emit }) => {
-      await delay1000;
-      emit("emit", 1000);
-      await delay2000;
-      emit("emit", 2000);
-      await delay3000;
-      emit("emit", 3000);
-      resolve("result");
-    });
+    const wrapped = new BroadcastPromise<string, number>(
+      async (resolve, reject, { emit }) => {
+        await delay1000;
+        emit("emit", 1000);
+        await delay2000;
+        emit("emit", 2000);
+        await delay3000;
+        emit("emit", 3000);
+        resolve("result");
+      }
+    );
 
-    const chained = wrapped.then(toUpper);
+    const chained: BroadcastPromise<string, number> = wrapped.then(toUpper);
     chained.on("emit", emit);
 
     jest.advanceTimersByTime(1000);
@@ -80,18 +84,20 @@ describe("emit", () => {
     const emit1 = jest.fn();
     const emit2 = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { emit }) => {
-      await delay1000;
-      emit("emit", 1000);
-      await delay2000;
-      emit("emit", 2000);
-      await delay3000;
-      emit("emit", 3000);
-      resolve("result");
-    }).on("emit", emit1);
+    const wrapped = new BroadcastPromise<string, number>(
+      async (resolve, reject, { emit }) => {
+        await delay1000;
+        emit("emit", 1000);
+        await delay2000;
+        emit("emit", 2000);
+        await delay3000;
+        emit("emit", 3000);
+        resolve("result");
+      }
+    ).on("emit", emit1);
 
     const delay4000 = delay(4000);
-    const chained = wrapped
+    const chained: BroadcastPromise<string, number> = wrapped
       .then(async (res, { emit }) => {
         await delay4000;
         emit("emit", 4000);
@@ -131,18 +137,20 @@ describe("emit", () => {
     const emit2 = jest.fn();
     const emit3 = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { emit }) => {
-      await delay1000;
-      emit("emit", 1000);
-      await delay2000;
-      emit("emit", 2000);
-      await delay3000;
-      emit("emit", 3000);
-      resolve("result");
-    }).on("emit", emit1);
+    const wrapped = new BroadcastPromise<string, string | number>(
+      async (resolve, reject, { emit }) => {
+        await delay1000;
+        emit("emit", 1000);
+        await delay2000;
+        emit("emit", 2000);
+        await delay3000;
+        emit("emit", 3000);
+        resolve("result");
+      }
+    ).on("emit", emit1);
 
     const delay4000 = delay(4000);
-    const chained1 = wrapped
+    const chained1: BroadcastPromise<string, string | number> = wrapped
       .then(async (res, { emit }) => {
         await delay4000;
         emit("emit", "chained1");
@@ -150,7 +158,7 @@ describe("emit", () => {
       })
       .on("emit", emit2);
 
-    const chained2 = wrapped
+    const chained2: BroadcastPromise<string, string | number> = wrapped
       .then(async (res, { emit }) => {
         await delay4000;
         emit("emit", "chained2");
@@ -188,7 +196,7 @@ describe("emit", () => {
 
   it("can emit from outside", async () => {
     const emit = jest.fn();
-    const wrapped = new BroadcastPromise("result");
+    const wrapped = new BroadcastPromise<string, string>("result");
     wrapped.on("emit", emit);
 
     expect(await wrapped).toEqual("result");
@@ -198,10 +206,12 @@ describe("emit", () => {
 
   it("can receive emit from outside", async () => {
     const emit = jest.fn();
-    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
-      on("emit", emit);
-      resolve("result");
-    });
+    const wrapped = new BroadcastPromise<string, string>(
+      (resolve, reject, { on }) => {
+        on("emit", emit);
+        resolve("result");
+      }
+    );
 
     expect(await wrapped).toEqual("result");
     wrapped.emit("emit", "outside emit");
@@ -210,11 +220,13 @@ describe("emit", () => {
 
   it("can receive emit from upstream promise", async () => {
     const emit = jest.fn();
-    const wrapped = new BroadcastPromise("result");
-    const chained = wrapped.then((result, { on }) => {
-      on("emit", emit);
-      return toUpper(result);
-    });
+    const wrapped = new BroadcastPromise<string, string>("result");
+    const chained: BroadcastPromise<string, string> = wrapped.then(
+      (result, { on }) => {
+        on("emit", emit);
+        return toUpper(result);
+      }
+    );
 
     expect(await wrapped).toEqual("result");
     expect(await chained).toEqual("RESULT");
@@ -224,11 +236,13 @@ describe("emit", () => {
 
   it("does not receive emit from downstream promise", async () => {
     const emit = jest.fn();
-    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
-      on("emit", emit);
-      resolve("result");
-    });
-    const chained = wrapped.then(toUpper);
+    const wrapped = new BroadcastPromise<string, string>(
+      (resolve, reject, { on }) => {
+        on("emit", emit);
+        resolve("result");
+      }
+    );
+    const chained: BroadcastPromise<string, string> = wrapped.then(toUpper);
 
     expect(await wrapped).toEqual("result");
     expect(await chained).toEqual("RESULT");
