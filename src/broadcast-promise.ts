@@ -80,13 +80,13 @@ const event = <B>(
 const emit = <B>(event: Broadcast<B>) => (
   type: string,
   value: B,
-  options: Options = {}
+  options?: Options
 ) => event(type, value, { downstream: true, ...options });
 
 const broadcast = <B>(event: Broadcast<B>) => (
   type: string,
   value: B,
-  options: Options = {}
+  options?: Options
 ) => event(type, value, { upstream: true, downstream: true, ...options });
 
 const on = <B>(listeners: Listeners<B>): Listen<B, void> => (
