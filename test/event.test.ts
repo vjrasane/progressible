@@ -1,4 +1,4 @@
-import BroadcastPromise from "../src";
+import Hooked from "../src";
 import { toUpper } from "lodash";
 
 jest.useFakeTimers();
@@ -15,7 +15,7 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { event }) => {
+    const wrapped = new Hooked(async (resolve, reject, { event }) => {
       await delay1000;
       event("event", 1000);
       await delay2000;
@@ -43,7 +43,7 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { event }) => {
+    const wrapped = new Hooked(async (resolve, reject, { event }) => {
       await delay1000;
       event("event", 1000, { self: false });
       resolve("result");
@@ -57,7 +57,7 @@ describe("event", () => {
 
   it("rejects promise if event handler throws an error", async () => {
     const delay1000 = delay(1000);
-    const wrapped = new BroadcastPromise(async (resolve, reject, { event }) => {
+    const wrapped = new Hooked(async (resolve, reject, { event }) => {
       await delay1000;
       event("event", 1000);
       resolve("result");
@@ -71,7 +71,7 @@ describe("event", () => {
   });
 
   it("throws an error if event handler is not a function", () => {
-    const wrapped = new BroadcastPromise();
+    const wrapped = new Hooked();
     expect(() => wrapped.on("event", undefined)).toThrow();
   });
 
@@ -82,7 +82,7 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { event }) => {
+    const wrapped = new Hooked(async (resolve, reject, { event }) => {
       await delay1000;
       event("event", 1000);
       await delay2000;
@@ -116,7 +116,7 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new BroadcastPromise("result").on("event", event);
+    const wrapped = new Hooked("result").on("event", event);
 
     const chained = wrapped.then(async (result, { event }) => {
       await delay1000;
@@ -149,7 +149,7 @@ describe("event", () => {
     const event2 = jest.fn();
     const event3 = jest.fn();
 
-    const wrapped = new BroadcastPromise(async (resolve, reject, { event }) => {
+    const wrapped = new Hooked(async (resolve, reject, { event }) => {
       await delay1000;
       event("event1", 1000);
       event("event2", 2000);
@@ -175,7 +175,7 @@ describe("event", () => {
 
     const error1 = jest.fn();
     const error2 = jest.fn();
-    const wrapped = new BroadcastPromise(promise).on("error", error1);
+    const wrapped = new Hooked(promise).on("error", error1);
     const chained = wrapped
       .catch((reason, { event }) => {
         event("error", reason);
@@ -192,7 +192,7 @@ describe("event", () => {
 
   it("can create event from outside", async () => {
     const event = jest.fn();
-    const wrapped = new BroadcastPromise("result");
+    const wrapped = new Hooked("result");
     wrapped.on("event", event);
 
     wrapped.event("event", "outside event");
@@ -203,7 +203,7 @@ describe("event", () => {
 
   it("does not receive event from outside if self option is false", async () => {
     const event = jest.fn();
-    const wrapped = new BroadcastPromise("result");
+    const wrapped = new Hooked("result");
     wrapped.on("event", event);
 
     wrapped.event("event", "outside event", { self: false });
@@ -214,7 +214,7 @@ describe("event", () => {
 
   it("can receive event from the outside", async () => {
     const event = jest.fn();
-    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+    const wrapped = new Hooked((resolve, reject, { on }) => {
       on("event", event);
       resolve("result");
     });
@@ -223,5 +223,22 @@ describe("event", () => {
 
     expect(await wrapped).toEqual("result");
     expect(event.mock.calls).toEqual([["outside event"]]);
+  });
+
+  it("can create event without value", async () => {
+    const event = jest.fn();
+    const delay1000 = delay(1000);
+    const wrapped = new Hooked<string, string>(
+      async (resolve, reject, { event }) => {
+        await delay1000;
+        event("event");
+        resolve("result");
+      }
+    ).on("event", event);
+
+    jest.advanceTimersByTime(1000);
+
+    expect(await wrapped).toEqual("result");
+    expect(event).toHaveBeenCalledTimes(1);
   });
 });

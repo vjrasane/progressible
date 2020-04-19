@@ -1,3 +1,3 @@
-import BroadcastPromise from "./broadcast-promise";
+import Hooked from "./hooked";
 
-export default BroadcastPromise;
+export default Hooked;
