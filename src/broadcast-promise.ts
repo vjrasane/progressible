@@ -203,12 +203,6 @@ class BroadcastPromise<R, B> {
       new BroadcastPromise<R, B>(__catch, __listeners, this.event, __downstream)
     );
   };
-
-  // TODO: figure out if needed
-  // resolve: Resolve<R> = (value?: R | PromiseLike<R>): void =>
-  //   this.__resolve(value);
-
-  // reject: Reject = (reason?: any): void => this.__reject(reason);
 }
 
 export default BroadcastPromise;

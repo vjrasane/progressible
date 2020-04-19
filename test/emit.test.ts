@@ -185,4 +185,54 @@ describe("emit", () => {
     expect(emit2.mock.calls).toEqual([[1000], [2000], [3000], ["chained1"]]);
     expect(emit3.mock.calls).toEqual([[1000], [2000], [3000], ["chained2"]]);
   });
+
+  it("can emit from outside", async () => {
+    const emit = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    wrapped.on("emit", emit);
+
+    expect(await wrapped).toEqual("result");
+    wrapped.emit("emit", "outside emit");
+    expect(emit.mock.calls).toEqual([["outside emit"]]);
+  });
+
+  it("can receive emit from outside", async () => {
+    const emit = jest.fn();
+    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+      on("emit", emit);
+      resolve("result");
+    });
+
+    expect(await wrapped).toEqual("result");
+    wrapped.emit("emit", "outside emit");
+    expect(emit.mock.calls).toEqual([["outside emit"]]);
+  });
+
+  it("can receive emit from upstream promise", async () => {
+    const emit = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    const chained = wrapped.then((result, { on }) => {
+      on("emit", emit);
+      return toUpper(result);
+    });
+
+    expect(await wrapped).toEqual("result");
+    expect(await chained).toEqual("RESULT");
+    wrapped.emit("emit", "outside emit");
+    expect(emit.mock.calls).toEqual([["outside emit"]]);
+  });
+
+  it("does not receive emit from downstream promise", async () => {
+    const emit = jest.fn();
+    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+      on("emit", emit);
+      resolve("result");
+    });
+    const chained = wrapped.then(toUpper);
+
+    expect(await wrapped).toEqual("result");
+    expect(await chained).toEqual("RESULT");
+    chained.emit("emit", "outside emit");
+    expect(emit).not.toHaveBeenCalled();
+  });
 });

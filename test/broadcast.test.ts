@@ -209,4 +209,54 @@ describe("broadcast", () => {
       ["chained2"],
     ]);
   });
+
+  it("can broadcast from outside", async () => {
+    const broadcast = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    wrapped.on("broadcast", broadcast);
+
+    expect(await wrapped).toEqual("result");
+    wrapped.broadcast("broadcast", "outside broadcast");
+    expect(broadcast.mock.calls).toEqual([["outside broadcast"]]);
+  });
+
+  it("can receive broadcast from outside", async () => {
+    const broadcast = jest.fn();
+    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+      on("broadcast", broadcast);
+      resolve("result");
+    });
+
+    expect(await wrapped).toEqual("result");
+    wrapped.broadcast("broadcast", "outside broadcast");
+    expect(broadcast.mock.calls).toEqual([["outside broadcast"]]);
+  });
+
+  it("can receive broadcast from upstream promise", async () => {
+    const broadcast = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    const chained = wrapped.then((result, { on }) => {
+      on("broadcast", broadcast);
+      return toUpper(result);
+    });
+
+    expect(await wrapped).toEqual("result");
+    expect(await chained).toEqual("RESULT");
+    wrapped.emit("broadcast", "broadcast emit");
+    expect(broadcast.mock.calls).toEqual([["broadcast emit"]]);
+  });
+
+  it("can receive broadcast from downstream promise", async () => {
+    const broadcast = jest.fn();
+    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+      on("broadcast", broadcast);
+      resolve("result");
+    });
+    const chained = wrapped.then(toUpper);
+
+    expect(await wrapped).toEqual("result");
+    expect(await chained).toEqual("RESULT");
+    chained.broadcast("broadcast", "outside broadcast");
+    expect(broadcast.mock.calls).toEqual([["outside broadcast"]]);
+  });
 });

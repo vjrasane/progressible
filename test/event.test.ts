@@ -189,4 +189,39 @@ describe("event", () => {
     expect(error1).not.toHaveBeenCalled();
     expect(error2.mock.calls).toEqual([[new Error("ERROR")]]);
   });
+
+  it("can create event from outside", async () => {
+    const event = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    wrapped.on("event", event);
+
+    wrapped.event("event", "outside event");
+
+    expect(await wrapped).toEqual("result");
+    expect(event.mock.calls).toEqual([["outside event"]]);
+  });
+
+  it("does not receive event from outside if self option is false", async () => {
+    const event = jest.fn();
+    const wrapped = new BroadcastPromise("result");
+    wrapped.on("event", event);
+
+    wrapped.event("event", "outside event", { self: false });
+
+    expect(await wrapped).toEqual("result");
+    expect(event).not.toHaveBeenCalled();
+  });
+
+  it("can receive event from the outside", async () => {
+    const event = jest.fn();
+    const wrapped = new BroadcastPromise((resolve, reject, { on }) => {
+      on("event", event);
+      resolve("result");
+    });
+
+    wrapped.event("event", "outside event");
+
+    expect(await wrapped).toEqual("result");
+    expect(event.mock.calls).toEqual([["outside event"]]);
+  });
 });
