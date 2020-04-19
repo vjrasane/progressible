@@ -1,7 +1,8 @@
 {
   "name": "progressible",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "./build/index.js",
+  "types": "./types/index.d.ts",
   "engines": {
     "node" : ">=10"
   },

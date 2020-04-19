@@ -1,2 +1,5 @@
 .vscode
+build
+types
+coverage
 node_modules
