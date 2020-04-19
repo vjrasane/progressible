@@ -1,7 +1,8 @@
 
 ![][ci badge] [![Coverage Status][coverage badge]][coveralls] [![License][license badge]][license]
 
-# Progressible
+# promise-hooks
+
 
 [ci badge]: https://github.com/vjrasane/progressible/workflows/CI/badge.svg
 [coverage badge]: https://coveralls.io/repos/github/vjrasane/progressible/badge.svg?service=github
