@@ -11,17 +11,17 @@ import {
   Options,
   Listen,
   Source,
+  Getter,
+  Setter,
 } from "./common";
 
 interface Listeners<B> {
   [key: string]: Listener<B>[];
 }
 
-const defaultOptions: Options = {
-  upstream: false,
-  downstream: false,
-  self: true,
-};
+interface Values<V> {
+  [key: string]: V;
+}
 
 const selfEvent = <T>(listeners: Listeners<T>) => (type: string, value?: T) => {
   if (type in listeners && isArray(listeners[type])) {
@@ -36,20 +36,26 @@ const cast = <A, B>(value: A) => {
   return <B>tmp;
 };
 
-const event = <T>(
+const defaultOptions = {
+  upstream: false,
+  downstream: false,
+  self: true,
+};
+
+const createEvent = <T>(
   listeners: Listeners<T>,
-  upstream: Source<T>,
-  downstream: Source<T>[],
+  upstream: __Internal<any, T, any>,
+  downstream: __Internal<any, T, any>[],
   reject: Reject
 ): Source<T> => (type: string, value?: T, options: Options = {}) => {
   try {
     const opts = merge({}, defaultOptions, options);
     if (opts.self) selfEvent(listeners)(type, value);
-    if (opts.upstream)
-      upstream(type, value, { ...opts, self: true, downstream: false });
+    if (opts.upstream && upstream)
+      upstream.event(type, value, { ...opts, self: true, downstream: false });
     if (opts.downstream) {
       downstream.forEach((down) =>
-        down(type, value, { ...opts, self: true, upstream: false })
+        down.event(type, value, { ...opts, self: true, upstream: false })
       );
     }
   } catch (error) {
@@ -57,19 +63,37 @@ const event = <T>(
   }
 };
 
-const emit = <T>(source: Source<T>) => (
+const createSet = <V>(
+  values: Values<V>,
+  upstream: __Internal<any, any, V>,
+  downstream: __Internal<any, any, V>[]
+): Setter<V> => (key: string, value?: V, options: Options = {}) => {
+  const opts = merge({}, defaultOptions, options);
+  if (opts.self) set(values, key, value);
+  if (opts.upstream && upstream)
+    upstream.set(key, value, { ...opts, self: true, downstream: false });
+  if (opts.downstream)
+    downstream.forEach((down) =>
+      down.set(key, value, { ...opts, self: true, upstream: false })
+    );
+};
+
+const createGet = <V>(values: Values<V>) => (key: string, defaultValue?: V) =>
+  get(values, key, defaultValue);
+
+const createEmit = <T>(source: Source<T>) => (
   type: string,
   value?: T,
   options?: Options
 ) => source(type, value, { downstream: true, ...options });
 
-const broadcast = <T>(source: Source<T>) => (
+const createBroadcast = <T>(source: Source<T>) => (
   type: string,
   value?: T,
   options?: Options
 ) => source(type, value, { upstream: true, downstream: true, ...options });
 
-const on = <T>(listeners: Listeners<T>): Listen<T, void> => (
+const createOn = <T>(listeners: Listeners<T>): Listen<T, void> => (
   type: string,
   listener: Listener<T>
 ) => {
@@ -80,36 +104,57 @@ const on = <T>(listeners: Listeners<T>): Listen<T, void> => (
   set(listeners, type, list);
 };
 
-const hooks = <T>(event: Source<T>, on: Listen<T, void>): Hooks<T> => ({
-  emit: emit(event),
-  broadcast: broadcast(event),
+const hooks = <T, V>(
+  event: Source<T>,
+  on: Listen<T, void>,
+  set: Setter<V>,
+  get: Getter<V>
+): Hooks<T, V> => ({
+  emit: createEmit(event),
+  broadcast: createBroadcast(event),
   event,
   on,
+  set,
+  get,
 });
 
-const createClosure = <T>(source: Source<T>, reject: Reject) => {
+const createClosure = <T, V>(
+  __upstream: __Internal<any, T, V>,
+  reject: Reject
+) => {
+  const __values = {};
   const __listeners = {};
   const __downstream = [];
-  const __event: Source<T> = event(__listeners, source, __downstream, reject);
-  const __on: Listen<T, void> = on(__listeners);
-  return { __listeners, __downstream, __event, __on };
+  const __event: Source<T> = createEvent(
+    __listeners,
+    __upstream,
+    __downstream,
+    reject
+  );
+  const __on: Listen<T, void> = createOn(__listeners);
+  const __set: Setter<V> = createSet(__values, __upstream, __downstream);
+  const __get: Getter<V> = createGet(__values);
+  return { __values, __listeners, __downstream, __event, __on, __set, __get };
 };
 
-class __Internal<A, T> {
+class __Internal<A, T, V> {
+  private readonly __values: Values<V>;
   private readonly __listeners: Listeners<T>;
   private readonly promise: Promise<A>;
-  private readonly __downstream: Source<T>[];
-  private readonly __upstream: Source<T>;
+  private readonly __downstream: __Internal<any, T, V>[];
+  private readonly __upstream: __Internal<any, T, V>;
 
   private __resolve: Resolve<A>;
   private __reject: Reject;
 
   constructor(
-    promiser?: Executor<A, T> | PromiseLike<A> | A,
+    promiser?: Executor<A, T, V> | PromiseLike<A> | A,
+    values: Values<V> = {},
     listeners: Listeners<T> = {},
-    upstream: Source<T> = noop,
-    downstream: Source<T>[] = []
+    upstream?: __Internal<any, T, V>,
+    downstream: __Internal<any, T, V>[] = []
   ) {
+    this.__values = values;
     this.__listeners = listeners;
     this.__upstream = upstream;
     this.__downstream = downstream;
@@ -118,38 +163,58 @@ class __Internal<A, T> {
       this.__resolve = resolve;
       this.__reject = reject;
       if (isFunction(promiser))
-        (<Executor<A, T>>promiser)(resolve, reject, hooks(this.event, this.on));
+        (<Executor<A, T, V>>promiser)(
+          resolve,
+          reject,
+          hooks(this.event, this.on, this.set, this.get)
+        );
       else resolve(<PromiseLike<A> | A>promiser);
     });
   }
 
-  event: Source<T> = (type: string, value?: T, options: Options = {}) =>
-    event(
+  event: Source<T> = (type: string, value?: T, options?: Options) =>
+    createEvent(
       this.__listeners,
       this.__upstream,
       this.__downstream,
       this.__reject
     )(type, value, options);
 
-  emit: Source<T> = emit(this.event);
+  emit: Source<T> = createEmit(this.event);
 
-  broadcast: Source<T> = broadcast(this.event);
+  broadcast: Source<T> = createBroadcast(this.event);
 
   on: Listen<T, this> = (event: string, listener: Listener<T>) => {
-    on(this.__listeners)(event, listener);
+    createOn(this.__listeners)(event, listener);
     return this;
   };
 
-  then = <B>(
-    onFulfilled?: OnFulfilled<A, B, T>,
-    onRejected?: OnRejected<T>
-  ): __Internal<B, T> => {
-    const { __event, __on, __listeners, __downstream } = createClosure(
-      this.event,
-      this.__reject
+  set: Setter<V> = (key: string, value?: V, options?: Options) => {
+    return createSet(this.__values, this.__upstream, this.__downstream)(
+      key,
+      value,
+      options
     );
+  };
 
-    const __hooks = hooks(__event, __on);
+  get: Getter<V> = (key: string, defaultValue?: V) =>
+    createGet(this.__values)(key, defaultValue);
+
+  then = <B>(
+    onFulfilled?: OnFulfilled<A, B, T, V>,
+    onRejected?: OnRejected<T, V>
+  ): __Internal<B, T, V> => {
+    const {
+      __event,
+      __on,
+      __listeners,
+      __values,
+      __downstream,
+      __set,
+      __get,
+    } = createClosure(this, this.__reject);
+
+    const __hooks = hooks(__event, __on, __set, __get);
     const __onFulfilled = isFunction(onFulfilled)
       ? (value?: A) => onFulfilled(value, __hooks)
       : undefined;
@@ -157,38 +222,64 @@ class __Internal<A, T> {
       ? (reason?: any) => onRejected(reason, __hooks)
       : undefined;
     const __then = this.promise.then(__onFulfilled, __onRejected);
-    this.__downstream.push(__event);
-    return cast(
-      new __Internal<B, T>(__then, __listeners, this.event, __downstream)
+    const __cast: __Internal<B, T, V> = cast(
+      new __Internal<B, T, V>(__then, __values, __listeners, this, __downstream)
     );
+    this.__downstream.push(__cast);
+    return __cast;
   };
 
-  catch = (onRejected?: OnRejected<T>): __Internal<A, T> => {
-    const { __event, __on, __listeners, __downstream } = createClosure(
-      this.event,
-      this.__reject
-    );
+  catch = (onRejected?: OnRejected<T, V>): __Internal<A, T, V> => {
+    const {
+      __event,
+      __on,
+      __listeners,
+      __values,
+      __downstream,
+      __set,
+      __get,
+    } = createClosure(this, this.__reject);
     const __onRejected = isFunction(onRejected)
-      ? (reason: any) => onRejected(reason, hooks(__event, __on))
+      ? (reason: any) => onRejected(reason, hooks(__event, __on, __set, __get))
       : undefined;
     const __catch = this.promise.catch(__onRejected);
-    return cast(
-      new __Internal<A, T>(__catch, __listeners, this.event, __downstream)
+    const __cast: __Internal<A, T, V> = cast(
+      new __Internal<A, T, V>(
+        __catch,
+        __values,
+        __listeners,
+        this,
+        __downstream
+      )
     );
+    this.__downstream.push(__cast);
+    return __cast;
   };
 
-  finally = (onSettled?: OnSettled<T>): __Internal<A, T> => {
-    const { __event, __on, __listeners, __downstream } = createClosure(
-      this.event,
-      this.__reject
-    );
+  finally = (onSettled?: OnSettled<T, V>): __Internal<A, T, V> => {
+    const {
+      __event,
+      __on,
+      __listeners,
+      __values,
+      __downstream,
+      __set,
+      __get,
+    } = createClosure(this, this.__reject);
     const __onSettled = isFunction(onSettled)
-      ? () => onSettled(hooks(__event, __on))
+      ? () => onSettled(hooks(__event, __on, __set, __get))
       : undefined;
     const __finally = this.promise.finally(__onSettled);
-    return cast(
-      new __Internal<A, T>(__finally, __listeners, this.event, __downstream)
+    const __cast: __Internal<A, T, V> = cast(
+      new __Internal<A, T, V>(
+        __finally,
+        __values,
+        __listeners,
+        this,
+        __downstream
+      )
     );
+    return __cast;
   };
 }
 

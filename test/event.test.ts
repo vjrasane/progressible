@@ -228,7 +228,7 @@ describe("event", () => {
   it("can create event without value", async () => {
     const event = jest.fn();
     const delay1000 = delay(1000);
-    const wrapped = new Hooked<string, string>(
+    const wrapped = new Hooked<string, string, any>(
       async (resolve, reject, { event }) => {
         await delay1000;
         event("event");

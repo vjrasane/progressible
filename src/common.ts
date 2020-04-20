@@ -14,24 +14,33 @@ type Listener<T> = (value?: T) => void;
 
 type Listen<T, R> = (event: string, listener: Listener<T>) => R;
 
-type Hooks<T> = {
+type Setter<T> = (key: string, value?: T, options?: Options) => void;
+
+type Getter<T> = (key: string, defaultValue?: T) => void;
+
+type Hooks<T, V> = {
   emit: Source<T>;
   event: Source<T>;
   broadcast: Source<T>;
   on: Listen<T, void>;
+  set: Setter<V>;
+  get: Getter<V>;
 };
 
-type Executor<A, T> = (
+type Executor<A, T, V> = (
   resolve: Resolve<A>,
   reject: Reject,
-  hooks: Hooks<T>
+  hooks: Hooks<T, V>
 ) => void;
 
-type OnFulfilled<A, B, T> = (value: A, hooks: Hooks<T>) => B | PromiseLike<B>;
+type OnFulfilled<A, B, T, V> = (
+  value: A,
+  hooks: Hooks<T, V>
+) => B | PromiseLike<B>;
 
-type OnRejected<T> = (reason: any, hooks: Hooks<T>) => PromiseLike<never>;
+type OnRejected<T, V> = (reason: any, hooks: Hooks<T, V>) => PromiseLike<never>;
 
-type OnSettled<T> = (hooks: Hooks<T>) => void;
+type OnSettled<T, V> = (hooks: Hooks<T, V>) => void;
 
 export {
   OnFulfilled,
@@ -45,4 +54,6 @@ export {
   Options,
   Listen,
   Source,
+  Setter,
+  Getter,
 };
