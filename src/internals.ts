@@ -45,21 +45,16 @@ const defaultOptions = {
 const createEvent = <T>(
   listeners: Listeners<T>,
   upstream: __Internal<any, T, any>,
-  downstream: __Internal<any, T, any>[],
-  reject: Reject
+  downstream: __Internal<any, T, any>[]
 ): Source<T> => (type: string, value?: T, options: Options = {}) => {
-  try {
-    const opts = merge({}, defaultOptions, options);
-    if (opts.self) selfEvent(listeners)(type, value);
-    if (opts.upstream && upstream)
-      upstream.event(type, value, { ...opts, self: true, downstream: false });
-    if (opts.downstream) {
-      downstream.forEach((down) =>
-        down.event(type, value, { ...opts, self: true, upstream: false })
-      );
-    }
-  } catch (error) {
-    reject(error);
+  const opts = merge({}, defaultOptions, options);
+  if (opts.self) selfEvent(listeners)(type, value);
+  if (opts.upstream && upstream)
+    upstream.event(type, value, { ...opts, self: true, downstream: false });
+  if (opts.downstream) {
+    downstream.forEach((down) =>
+      down.event(type, value, { ...opts, self: true, upstream: false })
+    );
   }
 };
 
@@ -118,19 +113,11 @@ const hooks = <T, V>(
   get,
 });
 
-const createClosure = <T, V>(
-  __upstream: __Internal<any, T, V>,
-  reject: Reject
-) => {
+const createClosure = <T, V>(__upstream: __Internal<any, T, V>) => {
   const __values = {};
   const __listeners = {};
   const __downstream = [];
-  const __event: Source<T> = createEvent(
-    __listeners,
-    __upstream,
-    __downstream,
-    reject
-  );
+  const __event: Source<T> = createEvent(__listeners, __upstream, __downstream);
   const __on: Listen<T, void> = createOn(__listeners);
   const __set: Setter<V> = createSet(__values, __upstream, __downstream);
   const __get: Getter<V> = createGet(__values);
@@ -143,9 +130,6 @@ class __Internal<A, T, V> {
   private readonly promise: Promise<A>;
   private readonly __downstream: __Internal<any, T, V>[];
   private readonly __upstream: __Internal<any, T, V>;
-
-  private __resolve: Resolve<A>;
-  private __reject: Reject;
 
   constructor(
     promiser?: Executor<A, T, V> | PromiseLike<A> | A,
@@ -160,8 +144,6 @@ class __Internal<A, T, V> {
     this.__downstream = downstream;
 
     this.promise = new Promise((resolve: Resolve<A>, reject) => {
-      this.__resolve = resolve;
-      this.__reject = reject;
       if (isFunction(promiser))
         (<Executor<A, T, V>>promiser)(
           resolve,
@@ -173,12 +155,11 @@ class __Internal<A, T, V> {
   }
 
   event: Source<T> = (type: string, value?: T, options?: Options) =>
-    createEvent(
-      this.__listeners,
-      this.__upstream,
-      this.__downstream,
-      this.__reject
-    )(type, value, options);
+    createEvent(this.__listeners, this.__upstream, this.__downstream)(
+      type,
+      value,
+      options
+    );
 
   emit: Source<T> = createEmit(this.event);
 
@@ -212,7 +193,7 @@ class __Internal<A, T, V> {
       __downstream,
       __set,
       __get,
-    } = createClosure(this, this.__reject);
+    } = createClosure(this);
 
     const __hooks = hooks(__event, __on, __set, __get);
     const __onFulfilled = isFunction(onFulfilled)
@@ -238,7 +219,7 @@ class __Internal<A, T, V> {
       __downstream,
       __set,
       __get,
-    } = createClosure(this, this.__reject);
+    } = createClosure(this);
     const __onRejected = isFunction(onRejected)
       ? (reason: any) => onRejected(reason, hooks(__event, __on, __set, __get))
       : undefined;
@@ -265,7 +246,7 @@ class __Internal<A, T, V> {
       __downstream,
       __set,
       __get,
-    } = createClosure(this, this.__reject);
+    } = createClosure(this);
     const __onSettled = isFunction(onSettled)
       ? () => onSettled(hooks(__event, __on, __set, __get))
       : undefined;

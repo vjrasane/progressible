@@ -15,15 +15,19 @@ describe("broadcast", () => {
 
     const broadcast = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { broadcast }) => {
+    const promise = async (broadcast) => {
       await delay1000;
       broadcast("broadcast", 1000);
       await delay2000;
       broadcast("broadcast", 2000);
       await delay3000;
       broadcast("broadcast", 3000);
-      resolve("result");
-    }).on("broadcast", broadcast);
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { broadcast }) =>
+      resolve(promise(broadcast))
+    ).on("broadcast", broadcast);
 
     jest.advanceTimersByTime(1000);
     await delay1000;
@@ -45,15 +49,19 @@ describe("broadcast", () => {
 
     const broadcast = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { broadcast }) => {
+    const promise = async (broadcast) => {
       await delay1000;
       broadcast("broadcast", 1000);
       await delay2000;
       broadcast("broadcast", 2000);
       await delay3000;
       broadcast("broadcast", 3000);
-      resolve("result");
-    });
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { broadcast }) =>
+      resolve(promise(broadcast))
+    );
 
     const chained = wrapped.then(toUpper);
     chained.on("broadcast", broadcast);
@@ -80,17 +88,24 @@ describe("broadcast", () => {
     const broadcast1 = jest.fn();
     const broadcast2 = jest.fn();
 
-    const wrapped = new Hooked<string, number, any>(
-      async (resolve, reject, { broadcast }) => {
-        await delay1000;
-        broadcast("broadcast", 1000);
-        await delay2000;
-        broadcast("broadcast", 2000);
-        await delay3000;
-        broadcast("broadcast", 3000);
-        resolve("result");
-      }
-    ).on("broadcast", broadcast1);
+    const promise = async (broadcast) => {
+      await delay1000;
+      broadcast("broadcast", 1000);
+      await delay2000;
+      broadcast("broadcast", 2000);
+      await delay3000;
+      broadcast("broadcast", 3000);
+      return "result";
+    };
+
+    const wrapped: Hooked<string, number, any> = new Hooked<
+      string,
+      number,
+      any
+    >((resolve, reject, { broadcast }) => resolve(promise(broadcast))).on(
+      "broadcast",
+      broadcast1
+    );
 
     const delay4000 = delay(4000);
     const chained: Hooked<string, number, any> = wrapped
@@ -133,17 +148,24 @@ describe("broadcast", () => {
     const broadcast2 = jest.fn();
     const broadcast3 = jest.fn();
 
-    const wrapped = new Hooked<string, number | string, any>(
-      async (resolve, reject, { broadcast }) => {
-        await delay1000;
-        broadcast("broadcast", 1000);
-        await delay2000;
-        broadcast("broadcast", 2000);
-        await delay3000;
-        broadcast("broadcast", 3000);
-        resolve("result");
-      }
-    ).on("broadcast", broadcast1);
+    const promise = async (broadcast) => {
+      await delay1000;
+      broadcast("broadcast", 1000);
+      await delay2000;
+      broadcast("broadcast", 2000);
+      await delay3000;
+      broadcast("broadcast", 3000);
+      return "result";
+    };
+
+    const wrapped: Hooked<string, number | string, any> = new Hooked<
+      string,
+      number | string,
+      any
+    >((resolve, reject, { broadcast }) => resolve(promise(broadcast))).on(
+      "broadcast",
+      broadcast1
+    );
 
     const delay4000 = delay(4000);
     const chained1: Hooked<string, number | string, any> = wrapped
@@ -259,12 +281,15 @@ describe("broadcast", () => {
   it("can broadcast without value", async () => {
     const broadcast = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (broadcast) => {
+      await delay1000;
+      broadcast("broadcast");
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { broadcast }) => {
-        await delay1000;
-        broadcast("broadcast");
-        resolve("result");
-      }
+      async (resolve, reject, { broadcast }) => resolve(promise(broadcast))
     ).on("broadcast", broadcast);
 
     jest.advanceTimersByTime(1000);
@@ -276,16 +301,19 @@ describe("broadcast", () => {
   it("does not broadcast anything when all options are set to false", async () => {
     const broadcast = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (broadcast) => {
+      await delay1000;
+      broadcast("broadcast", "message", {
+        self: false,
+        downstream: false,
+        upstream: false,
+      });
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { broadcast }) => {
-        await delay1000;
-        broadcast("broadcast", "message", {
-          self: false,
-          downstream: false,
-          upstream: false,
-        });
-        resolve("result");
-      }
+      async (resolve, reject, { broadcast }) => resolve(promise(broadcast))
     ).on("broadcast", broadcast);
 
     jest.advanceTimersByTime(1000);
@@ -297,12 +325,15 @@ describe("broadcast", () => {
   it("does not broadcast anything from outside when all options are set to false", async () => {
     const broadcast = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (on) => {
+      await delay1000;
+      on("broadcast", broadcast);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { on }) => {
-        await delay1000;
-        on("broadcast", broadcast);
-        resolve("result");
-      }
+      async (resolve, reject, { on }) => resolve(promise(on))
     );
 
     jest.advanceTimersByTime(1000);

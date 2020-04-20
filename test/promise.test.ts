@@ -87,4 +87,23 @@ describe("promise", () => {
     expect(await wrapped).toEqual("result");
     expect(await chained).toEqual("result");
   });
+
+  it("rejects if executor throws an error", async () => {
+    expect.assertions(1);
+    const wrapped = new Hooked(() => {
+      throw new Error("ERROR");
+    });
+
+    await expect(wrapped).rejects.toEqual(new Error("ERROR"));
+  });
+
+  it("rejects if executor resolve receives a promise that rejects", async () => {
+    expect.assertions(1);
+
+    const wrapped = new Hooked((resolve) =>
+      resolve(Promise.reject(new Error("ERROR")))
+    );
+
+    await expect(wrapped).rejects.toEqual(new Error("ERROR"));
+  });
 });

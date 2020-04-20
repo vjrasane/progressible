@@ -15,16 +15,18 @@ describe("emit", () => {
 
     const emit = jest.fn();
 
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit", 1000);
+      await delay2000;
+      emit("emit", 2000);
+      await delay3000;
+      emit("emit", 3000);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, number, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit", 1000);
-        await delay2000;
-        emit("emit", 2000);
-        await delay3000;
-        emit("emit", 3000);
-        resolve("result");
-      }
+      (resolve, reject, { emit }) => resolve(promise(emit))
     ).on("emit", emit);
 
     jest.advanceTimersByTime(1000);
@@ -47,16 +49,18 @@ describe("emit", () => {
 
     const emit = jest.fn();
 
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit", 1000);
+      await delay2000;
+      emit("emit", 2000);
+      await delay3000;
+      emit("emit", 3000);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, number, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit", 1000);
-        await delay2000;
-        emit("emit", 2000);
-        await delay3000;
-        emit("emit", 3000);
-        resolve("result");
-      }
+      async (resolve, reject, { emit }) => resolve(promise(emit))
     );
 
     const chained: Hooked<string, number, any> = wrapped.then(toUpper);
@@ -84,16 +88,18 @@ describe("emit", () => {
     const emit1 = jest.fn();
     const emit2 = jest.fn();
 
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit", 1000);
+      await delay2000;
+      emit("emit", 2000);
+      await delay3000;
+      emit("emit", 3000);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, number, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit", 1000);
-        await delay2000;
-        emit("emit", 2000);
-        await delay3000;
-        emit("emit", 3000);
-        resolve("result");
-      }
+      async (resolve, reject, { emit }) => resolve(promise(emit))
     ).on("emit", emit1);
 
     const delay4000 = delay(4000);
@@ -137,16 +143,18 @@ describe("emit", () => {
     const emit2 = jest.fn();
     const emit3 = jest.fn();
 
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit", 1000);
+      await delay2000;
+      emit("emit", 2000);
+      await delay3000;
+      emit("emit", 3000);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string | number, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit", 1000);
-        await delay2000;
-        emit("emit", 2000);
-        await delay3000;
-        emit("emit", 3000);
-        resolve("result");
-      }
+      async (resolve, reject, { emit }) => resolve(promise(emit))
     ).on("emit", emit1);
 
     const delay4000 = delay(4000);
@@ -253,12 +261,15 @@ describe("emit", () => {
   it("can emit without value", async () => {
     const emit = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit");
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit");
-        resolve("result");
-      }
+      async (resolve, reject, { emit }) => resolve(promise(emit))
     ).on("emit", emit);
 
     jest.advanceTimersByTime(1000);
@@ -270,16 +281,19 @@ describe("emit", () => {
   it("does not emit anything when all options are set to false", async () => {
     const emit = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (emit) => {
+      await delay1000;
+      emit("emit", "message", {
+        self: false,
+        downstream: false,
+        upstream: false,
+      });
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { emit }) => {
-        await delay1000;
-        emit("emit", "message", {
-          self: false,
-          downstream: false,
-          upstream: false,
-        });
-        resolve("result");
-      }
+      async (resolve, reject, { emit }) => resolve(promise(emit))
     ).on("emit", emit);
 
     jest.advanceTimersByTime(1000);
@@ -291,12 +305,15 @@ describe("emit", () => {
   it("does not emit anything from outside when all options are set to false", async () => {
     const emit = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (on) => {
+      await delay1000;
+      on("emit", emit);
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { on }) => {
-        await delay1000;
-        on("emit", emit);
-        resolve("result");
-      }
+      async (resolve, reject, { on }) => resolve(promise(on))
     );
 
     jest.advanceTimersByTime(1000);

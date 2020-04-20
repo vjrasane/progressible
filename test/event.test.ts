@@ -15,15 +15,19 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { event }) => {
+    const promise = async (event) => {
       await delay1000;
       event("event", 1000);
       await delay2000;
       event("event", 2000);
       await delay3000;
       event("event", 3000);
-      resolve("result");
-    }).on("event", event);
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { event }) =>
+      resolve(promise(event))
+    ).on("event", event);
 
     jest.advanceTimersByTime(1000);
     await delay1000;
@@ -43,11 +47,15 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { event }) => {
+    const promise = async (event) => {
       await delay1000;
       event("event", 1000, { self: false });
-      resolve("result");
-    }).on("event", event);
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { event }) =>
+      resolve(promise(event))
+    ).on("event", event);
 
     jest.advanceTimersByTime(1000);
     await delay1000;
@@ -56,18 +64,24 @@ describe("event", () => {
   });
 
   it("rejects promise if event handler throws an error", async () => {
+    expect.assertions(1);
     const delay1000 = delay(1000);
-    const wrapped = new Hooked(async (resolve, reject, { event }) => {
+
+    const promise = async (event) => {
       await delay1000;
       event("event", 1000);
-      resolve("result");
-    }).on("event", () => {
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { event }) =>
+      resolve(promise(event))
+    ).on("event", () => {
       throw Error("ERROR");
     });
 
     jest.advanceTimersByTime(1000);
 
-    expect(wrapped).rejects.toEqual(new Error("ERROR"));
+    await expect(wrapped).rejects.toEqual(new Error("ERROR"));
   });
 
   it("throws an error if event handler is not a function", () => {
@@ -82,15 +96,19 @@ describe("event", () => {
 
     const event = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { event }) => {
+    const promise = async (event) => {
       await delay1000;
       event("event", 1000);
       await delay2000;
       event("event", 2000);
       await delay3000;
       event("event", 3000);
-      resolve("result");
-    });
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { event }) =>
+      resolve(promise(event))
+    );
 
     const chained = wrapped.then(toUpper);
     chained.on("event", event);
@@ -149,13 +167,17 @@ describe("event", () => {
     const event2 = jest.fn();
     const event3 = jest.fn();
 
-    const wrapped = new Hooked(async (resolve, reject, { event }) => {
+    const promise = async (event) => {
       await delay1000;
       event("event1", 1000);
       event("event2", 2000);
       event("event3", 3000);
-      resolve("result");
-    })
+      return "result";
+    };
+
+    const wrapped = new Hooked((resolve, reject, { event }) =>
+      resolve(promise(event))
+    )
       .on("event1", event1)
       .on("event2", event2)
       .on("event3", event3);
@@ -228,12 +250,15 @@ describe("event", () => {
   it("can create event without value", async () => {
     const event = jest.fn();
     const delay1000 = delay(1000);
+
+    const promise = async (event) => {
+      await delay1000;
+      event("event");
+      return "result";
+    };
+
     const wrapped = new Hooked<string, string, any>(
-      async (resolve, reject, { event }) => {
-        await delay1000;
-        event("event");
-        resolve("result");
-      }
+      (resolve, reject, { event }) => resolve(promise(event))
     ).on("event", event);
 
     jest.advanceTimersByTime(1000);
