@@ -3,3 +3,4 @@ build
 types
 coverage
 node_modules
+*.log

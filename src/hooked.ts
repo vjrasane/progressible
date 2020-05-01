@@ -1,5 +1,3 @@
-import { isFunction } from "lodash";
-
 import __Internal from "./internals";
 import {
   OnFulfilled,

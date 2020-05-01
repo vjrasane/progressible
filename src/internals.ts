@@ -1,11 +1,13 @@
-import { noop, isFunction, isArray, get, set, merge } from "lodash";
+import isFunction from "lodash.isfunction";
+import get from "lodash.get";
+import set from "lodash.set";
+import merge from "lodash.merge";
 import {
   OnFulfilled,
   OnRejected,
   OnSettled,
   Executor,
   Resolve,
-  Reject,
   Hooks,
   Listener,
   Options,
@@ -14,22 +16,11 @@ import {
   Getter,
   Setter,
 } from "./common";
-
-interface Listeners<B> {
-  [key: string]: Listener<B>[];
-}
+import { EventEmitter } from "events";
 
 interface Values<V> {
   [key: string]: V;
 }
-
-const selfEvent = <T>(listeners: Listeners<T>) => (type: string, value?: T) => {
-  if (type in listeners && isArray(listeners[type])) {
-    (listeners[type] as Listener<T>[]).forEach((listen: Listener<T>) =>
-      listen(value)
-    );
-  }
-};
 
 const cast = <A, B>(value: A) => {
   const tmp: any = <any>value;
@@ -43,12 +34,12 @@ const defaultOptions = {
 };
 
 const createEvent = <T>(
-  listeners: Listeners<T>,
+  emitter: EventEmitter,
   upstream: __Internal<any, T, any>,
   downstream: __Internal<any, T, any>[]
 ): Source<T> => (type: string, value?: T, options: Options = {}) => {
   const opts = merge({}, defaultOptions, options);
-  if (opts.self) selfEvent(listeners)(type, value);
+  if (opts.self) emitter.emit(type, value);
   if (opts.upstream && upstream)
     upstream.event(type, value, { ...opts, self: true, downstream: false });
   if (opts.downstream) {
@@ -88,17 +79,6 @@ const createBroadcast = <T>(source: Source<T>) => (
   options?: Options
 ) => source(type, value, { upstream: true, downstream: true, ...options });
 
-const createOn = <T>(listeners: Listeners<T>): Listen<T, void> => (
-  type: string,
-  listener: Listener<T>
-) => {
-  if (!isFunction(listener))
-    throw Error(`Event handler must be a function, was: ${typeof listener}`);
-  const list: Listener<T>[] = get(listeners, type, []);
-  list.push(listener);
-  set(listeners, type, list);
-};
-
 const hooks = <T, V>(
   event: Source<T>,
   on: Listen<T, void>,
@@ -115,18 +95,19 @@ const hooks = <T, V>(
 
 const createClosure = <T, V>(__upstream: __Internal<any, T, V>) => {
   const __values = {};
-  const __listeners = {};
+  const __emitter = new EventEmitter();
   const __downstream = [];
-  const __event: Source<T> = createEvent(__listeners, __upstream, __downstream);
-  const __on: Listen<T, void> = createOn(__listeners);
+  const __event: Source<T> = createEvent(__emitter, __upstream, __downstream);
+  const __on: Listen<T, void> = (type, listener) =>
+    __emitter.on(type, listener);
   const __set: Setter<V> = createSet(__values, __upstream, __downstream);
   const __get: Getter<V> = createGet(__values);
-  return { __values, __listeners, __downstream, __event, __on, __set, __get };
+  return { __values, __emitter, __downstream, __event, __on, __set, __get };
 };
 
 class __Internal<A, T, V> {
+  private readonly __emitter: EventEmitter;
   private readonly __values: Values<V>;
-  private readonly __listeners: Listeners<T>;
   private readonly promise: Promise<A>;
   private readonly __downstream: __Internal<any, T, V>[];
   private readonly __upstream: __Internal<any, T, V>;
@@ -134,12 +115,12 @@ class __Internal<A, T, V> {
   constructor(
     promiser?: Executor<A, T, V> | PromiseLike<A> | A,
     values: Values<V> = {},
-    listeners: Listeners<T> = {},
+    emitter: EventEmitter = new EventEmitter(),
     upstream?: __Internal<any, T, V>,
     downstream: __Internal<any, T, V>[] = []
   ) {
     this.__values = values;
-    this.__listeners = listeners;
+    this.__emitter = emitter;
     this.__upstream = upstream;
     this.__downstream = downstream;
 
@@ -155,7 +136,7 @@ class __Internal<A, T, V> {
   }
 
   event: Source<T> = (type: string, value?: T, options?: Options) =>
-    createEvent(this.__listeners, this.__upstream, this.__downstream)(
+    createEvent(this.__emitter, this.__upstream, this.__downstream)(
       type,
       value,
       options
@@ -166,7 +147,7 @@ class __Internal<A, T, V> {
   broadcast: Source<T> = createBroadcast(this.event);
 
   on: Listen<T, this> = (event: string, listener: Listener<T>) => {
-    createOn(this.__listeners)(event, listener);
+    this.__emitter.on(event, listener);
     return this;
   };
 
@@ -188,7 +169,7 @@ class __Internal<A, T, V> {
     const {
       __event,
       __on,
-      __listeners,
+      __emitter,
       __values,
       __downstream,
       __set,
@@ -204,7 +185,7 @@ class __Internal<A, T, V> {
       : undefined;
     const __then = this.promise.then(__onFulfilled, __onRejected);
     const __cast: __Internal<B, T, V> = cast(
-      new __Internal<B, T, V>(__then, __values, __listeners, this, __downstream)
+      new __Internal<B, T, V>(__then, __values, __emitter, this, __downstream)
     );
     this.__downstream.push(__cast);
     return __cast;
@@ -214,7 +195,7 @@ class __Internal<A, T, V> {
     const {
       __event,
       __on,
-      __listeners,
+      __emitter,
       __values,
       __downstream,
       __set,
@@ -225,13 +206,7 @@ class __Internal<A, T, V> {
       : undefined;
     const __catch = this.promise.catch(__onRejected);
     const __cast: __Internal<A, T, V> = cast(
-      new __Internal<A, T, V>(
-        __catch,
-        __values,
-        __listeners,
-        this,
-        __downstream
-      )
+      new __Internal<A, T, V>(__catch, __values, __emitter, this, __downstream)
     );
     this.__downstream.push(__cast);
     return __cast;
@@ -241,7 +216,7 @@ class __Internal<A, T, V> {
     const {
       __event,
       __on,
-      __listeners,
+      __emitter,
       __values,
       __downstream,
       __set,
@@ -255,7 +230,7 @@ class __Internal<A, T, V> {
       new __Internal<A, T, V>(
         __finally,
         __values,
-        __listeners,
+        __emitter,
         this,
         __downstream
       )
